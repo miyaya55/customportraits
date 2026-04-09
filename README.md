@@ -203,3 +203,9 @@ customport/
 - [ ] バッチ処理機能
 - [ ] ビュー画面での細部調整
 - [ ] エクスポートプリセット
+
+## exe 化
+
+- `build_exe.bat` を実行すると exe をビルドできます
+- 生成先は `dist\CustomPortraitTool.exe` です
+- Python と依存パッケージが入っている環境で実行してください

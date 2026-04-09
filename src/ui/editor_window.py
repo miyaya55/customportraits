@@ -4,6 +4,8 @@ from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
+    QCheckBox,
+    QComboBox,
     QGroupBox,
     QPushButton,
     QLabel,
@@ -249,6 +251,7 @@ class EditorWindow(QWidget):
 
     image_updated = pyqtSignal(object)
     image_cleared = pyqtSignal()
+    export_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -342,6 +345,23 @@ class EditorWindow(QWidget):
         flip_layout.addWidget(self.flip_btn)
         flip_group.setLayout(flip_layout)
         tool_layout.addWidget(flip_group)
+
+        export_group = QGroupBox("画像出力")
+        export_layout = QVBoxLayout()
+        format_layout = QHBoxLayout()
+        format_layout.addWidget(QLabel("出力形式:"))
+        self.format_combo = QComboBox()
+        self.format_combo.addItems(["PNG", "BMP"])
+        format_layout.addWidget(self.format_combo)
+        export_layout.addLayout(format_layout)
+        self.include_bg_checkbox = QCheckBox("背景を含める")
+        self.include_bg_checkbox.setChecked(True)
+        export_layout.addWidget(self.include_bg_checkbox)
+        self.export_btn = QPushButton("画像を出力")
+        self.export_btn.clicked.connect(self.export_requested.emit)
+        export_layout.addWidget(self.export_btn)
+        export_group.setLayout(export_layout)
+        tool_layout.addWidget(export_group)
 
         tool_layout.addStretch()
         main_layout.addLayout(tool_layout, 1)
@@ -578,3 +598,11 @@ class EditorWindow(QWidget):
         if not self.preview_image:
             return None
         return self.preview_image.copy()
+
+    def get_output_format(self):
+        """選択中の出力形式を返す。"""
+        return self.format_combo.currentText()
+
+    def should_include_background(self):
+        """背景を含めて出力するか返す。"""
+        return self.include_bg_checkbox.isChecked()

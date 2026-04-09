@@ -6,12 +6,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from PyQt5.QtWidgets import QApplication, QMessageBox, QPushButton
+from PyQt5.QtWidgets import QApplication, QMessageBox
 
-from src.ui.main_window import MainWindow
-from src.ui.viewer_window import ViewerWindow
+from src.ui.main_window_v3 import MainWindow
+from src.ui.viewer_window_v2 import ViewerWindow
 from src.ui.editor_window import EditorWindow
-from src.core.config import ConfigManager, PortraitureDB
+from src.core.config import ConfigManager
+from src.core.portraiture_db import PortraitureDB
 from src.core.file_manager import FileManager
 from src.core.image_processor import ImageProcessor
 from src.utils.constants import CONFIG_FILE, PORTRAITURE_DB_FILE
@@ -31,18 +32,11 @@ class CustomPortraitApp:
         self.edited_character_image = None
         self.character_states = {}
         self.connect_signals()
-        self.setup_export_button()
+        self.setup_export_action()
 
-    def setup_export_button(self):
-        """エクスポートボタンをメイン画面に追加する"""
-        export_btn = QPushButton("画像を出力")
-        export_btn.clicked.connect(self.export_portrait)
-
-        main_layout = self.main_window.centralWidget().layout()
-        if main_layout and main_layout.count() >= 2:
-            right_layout_item = main_layout.itemAt(1)
-            if right_layout_item and right_layout_item.layout():
-                right_layout_item.layout().addWidget(export_btn)
+    def setup_export_action(self):
+        """キャラクター編集画面の出力操作を接続する。"""
+        self.editor_window.export_requested.connect(self.export_portrait)
 
     def connect_signals(self):
         """シグナルを接続する"""
@@ -94,11 +88,13 @@ class CustomPortraitApp:
         if not self.current_category or not self.current_subcategory:
             self.edited_character_image = None
             self.viewer_window.set_background()
+            self.viewer_window.set_guide_image()
             self.viewer_window.clear_character()
             if sync_editor:
                 self.editor_window.clear_image()
             return
 
+        self.portraiture_db.load()
         subcategory_data = self.portraiture_db.get_subcategory(
             self.current_category,
             self.current_subcategory,
@@ -107,6 +103,11 @@ class CustomPortraitApp:
             self.viewer_window.set_background(subcategory_data["background"])
         else:
             self.viewer_window.set_background()
+
+        if subcategory_data and subcategory_data.get("guide_image"):
+            self.viewer_window.set_guide_image(subcategory_data["guide_image"])
+        else:
+            self.viewer_window.set_guide_image()
 
         state = self.character_states.get(self.get_current_state_key())
         if state and state.get("image") is not None:
@@ -178,8 +179,8 @@ class CustomPortraitApp:
             QMessageBox.warning(self.main_window, "警告", "キャラクターがまだ選択されていません")
             return
 
-        output_format = self.main_window.format_combo.currentText()
-        include_background = self.main_window.include_bg_checkbox.isChecked()
+        output_format = self.editor_window.get_output_format()
+        include_background = self.editor_window.should_include_background()
 
         output_dir = FileManager.create_output_directory(
             self.current_category,
@@ -190,7 +191,7 @@ class CustomPortraitApp:
             return
 
         if include_background:
-            display_image = self.viewer_window.get_display_image()
+            display_image = self.viewer_window.get_display_image(include_guide=False)
         else:
             display_image = self.edited_character_image.copy()
 
