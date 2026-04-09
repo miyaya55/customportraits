@@ -50,8 +50,11 @@
 
 1. プロジェクトフォルダに移動
 ```bash
-cd C:/path/to/customport
+cd C:\path\to\customport
 ```
+
+- プロジェクトフォルダは好きな場所に作成して問題ありません
+- 以降のコマンドは、このプロジェクトを置いたフォルダで実行してください
 
 2. 依存パッケージをインストール
 ```bash
@@ -69,7 +72,7 @@ python run.py
 python -m src.main
 
 # 方法3: 直接スクリプトを実行（要・プロジェクトルート移動）
-cd C:/path/to/customport
+cd C:\path\to\customport
 python src/main.py
 ```
 
@@ -86,7 +89,7 @@ python src/main.py
 
 3. **キャラクターを登録**
    - カテゴリとサブカテゴリを選択
-   - 「キャラクター登録」をクリック
+   - 「キャラクター画像作成」をクリック
    - 編集ウィンドウでキャラクター画像を加工
 
 4. **ポートレートを出力**
@@ -125,7 +128,8 @@ python src/main.py
 ## ファイル構成
 
 ```
-customport/
+[任意の作業フォルダ]/
+└── customport/
 ├── src/
 │   ├── main.py                  - エントリーポイント
 │   ├── core/
@@ -209,6 +213,7 @@ customport/
 - `build_exe.bat` を実行すると exe をビルドできます
 - 生成先は `dist\CustomPortraitTool.exe` です
 - Python と依存パッケージが入っている環境で実行してください
+- プロジェクトの配置先は任意です。好きな場所に `customport` フォルダを置いてビルドできます
 
 ## Alphaマスク補正
 

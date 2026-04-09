@@ -5,6 +5,7 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (
     QDialog,
     QFileDialog,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -104,6 +105,7 @@ class CategoryDialog(QDialog):
 
         button_layout = QHBoxLayout()
         ok_btn = QPushButton("OK")
+        ok_btn.setProperty("buttonRole", "primary")
         ok_btn.clicked.connect(self.accept)
         cancel_btn = QPushButton("キャンセル")
         cancel_btn.clicked.connect(self.reject)
@@ -170,6 +172,7 @@ class SubcategoryDialog(QDialog):
 
         button_layout = QHBoxLayout()
         ok_btn = QPushButton("OK")
+        ok_btn.setProperty("buttonRole", "primary")
         ok_btn.clicked.connect(self.accept)
         cancel_btn = QPushButton("キャンセル")
         cancel_btn.clicked.connect(self.reject)
@@ -192,6 +195,7 @@ class SubcategoryDialog(QDialog):
 
         button_row = QHBoxLayout()
         select_btn = QPushButton("画像を選択")
+        select_btn.setProperty("buttonRole", "primary")
         select_btn.clicked.connect(on_pick)
         clear_btn = QPushButton("クリア")
         clear_btn.clicked.connect(lambda: on_drop(""))
@@ -273,10 +277,16 @@ class MainWindow(QMainWindow):
         category_layout.addWidget(self.category_list)
 
         category_button_layout = QHBoxLayout()
+        category_button_layout.setSpacing(10)
         add_cat_btn = QPushButton("カテゴリ追加")
+        add_cat_btn.setProperty("buttonRole", "primary")
         add_cat_btn.clicked.connect(self.add_category)
+        add_cat_btn.setMinimumHeight(38)
+        add_cat_btn.setMinimumWidth(148)
         del_cat_btn = QPushButton("カテゴリ削除")
         del_cat_btn.clicked.connect(self.delete_category)
+        del_cat_btn.setMinimumHeight(38)
+        del_cat_btn.setMinimumWidth(148)
         category_button_layout.addWidget(add_cat_btn)
         category_button_layout.addWidget(del_cat_btn)
         category_layout.addLayout(category_button_layout)
@@ -292,31 +302,46 @@ class MainWindow(QMainWindow):
         self.subcategory_list.itemSelectionChanged.connect(self.on_subcategory_selected)
         subcategory_layout.addWidget(self.subcategory_list)
 
-        subcategory_button_layout = QHBoxLayout()
+        subcategory_button_layout = QGridLayout()
+        subcategory_button_layout.setHorizontalSpacing(10)
+        subcategory_button_layout.setVerticalSpacing(8)
         add_subcat_btn = QPushButton("サブカテゴリ追加")
+        add_subcat_btn.setProperty("buttonRole", "primary")
         add_subcat_btn.clicked.connect(self.add_subcategory)
+        add_subcat_btn.setMinimumHeight(38)
+        add_subcat_btn.setMinimumWidth(148)
         edit_bg_btn = QPushButton("背景変更")
         edit_bg_btn.clicked.connect(self.edit_subcategory_background)
+        edit_bg_btn.setMinimumHeight(38)
+        edit_bg_btn.setMinimumWidth(148)
         edit_guide_btn = QPushButton("位置ガイド変更")
         edit_guide_btn.clicked.connect(self.edit_subcategory_guide_image)
+        edit_guide_btn.setMinimumHeight(38)
+        edit_guide_btn.setMinimumWidth(148)
         edit_mask_btn = QPushButton("固定マスク変更")
         edit_mask_btn.clicked.connect(self.edit_subcategory_mask_image)
+        edit_mask_btn.setMinimumHeight(38)
+        edit_mask_btn.setMinimumWidth(148)
         del_subcat_btn = QPushButton("サブカテゴリ削除")
         del_subcat_btn.clicked.connect(self.delete_subcategory)
-        subcategory_button_layout.addWidget(add_subcat_btn)
-        subcategory_button_layout.addWidget(edit_bg_btn)
-        subcategory_button_layout.addWidget(edit_guide_btn)
-        subcategory_button_layout.addWidget(edit_mask_btn)
-        subcategory_button_layout.addWidget(del_subcat_btn)
+        del_subcat_btn.setMinimumHeight(38)
+        del_subcat_btn.setMinimumWidth(148)
+        subcategory_button_layout.addWidget(add_subcat_btn, 0, 0)
+        subcategory_button_layout.addWidget(edit_bg_btn, 0, 1)
+        subcategory_button_layout.addWidget(edit_guide_btn, 0, 2)
+        subcategory_button_layout.addWidget(edit_mask_btn, 1, 0)
+        subcategory_button_layout.addWidget(del_subcat_btn, 1, 1, 1, 2)
         subcategory_layout.addLayout(subcategory_button_layout)
 
         subcategory_group.setLayout(subcategory_layout)
         right_layout.addWidget(subcategory_group)
 
         character_layout = QHBoxLayout()
-        self.char_registration_btn = QPushButton("キャラクター登録")
+        self.char_registration_btn = QPushButton("キャラクター画像作成")
+        self.char_registration_btn.setProperty("buttonRole", "primary")
         self.char_registration_btn.clicked.connect(self.on_character_registration)
         self.char_registration_btn.setEnabled(False)
+        self.char_registration_btn.setMinimumHeight(46)
         character_layout.addWidget(self.char_registration_btn)
         right_layout.addLayout(character_layout)
 

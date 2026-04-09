@@ -24,10 +24,12 @@ QPushButton {
     background-color: #0078d4;
     color: white;
     border: none;
-    border-radius: 4px;
-    padding: 5px 15px;
-    font-size: 11px;
+    border-radius: 6px;
+    padding: 10px 18px;
+    font-size: 13px;
     font-weight: bold;
+    min-height: 28px;
+    min-width: 116px;
 }
 
 QPushButton:hover {
@@ -41,6 +43,23 @@ QPushButton:pressed {
 QPushButton:disabled {
     background-color: #cccccc;
     color: #666666;
+}
+
+QPushButton[buttonRole="primary"] {
+    background-color: #1f9d63;
+}
+
+QPushButton[buttonRole="primary"]:hover {
+    background-color: #27ad70;
+}
+
+QPushButton[buttonRole="primary"]:pressed {
+    background-color: #14784a;
+}
+
+QPushButton[buttonRole="primary"]:disabled {
+    background-color: #b9d8c8;
+    color: #f5f5f5;
 }
 
 QLineEdit, QSpinBox, QDoubleSpinBox {
