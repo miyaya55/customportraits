@@ -2,7 +2,8 @@
 
 from pathlib import Path
 from typing import Optional, Tuple
-from PIL import Image
+from collections import deque
+from PIL import Image, ImageFilter
 import numpy as np
 
 
@@ -27,7 +28,11 @@ class ImageProcessor:
         return image.crop(box)
 
     @staticmethod
-    def scale_image(image: Image.Image, scale_percent: float) -> Image.Image:
+    def scale_image(
+        image: Image.Image,
+        scale_percent: float,
+        resampling=Image.Resampling.LANCZOS,
+    ) -> Image.Image:
         """
         画像を拡大・縮小する
         scale_percent: 100%を基準（100=等倍、200=2倍など）
@@ -40,7 +45,7 @@ class ImageProcessor:
             int(image.width * scale_factor),
             int(image.height * scale_factor),
         )
-        return image.resize(new_size, Image.Resampling.LANCZOS)
+        return image.resize(new_size, resampling)
 
     @staticmethod
     def flip_horizontal(image: Image.Image) -> Image.Image:
@@ -115,6 +120,99 @@ class ImageProcessor:
         except Exception as e:
             print(f"画像の保存エラー: {e}")
             return False
+
+    @staticmethod
+    def save_mask_image(mask_image: Image.Image, output_path: str, format: str = "PNG") -> bool:
+        try:
+            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+            grayscale_mask = mask_image.convert("L")
+
+            if format.upper() == "PNG":
+                grayscale_mask.save(output_path, "PNG")
+            elif format.upper() == "BMP":
+                grayscale_mask.save(output_path, "BMP")
+            else:
+                return False
+
+            return True
+        except Exception as e:
+            print(f"マスク画像の保存エラー: {e}")
+            return False
+
+    @staticmethod
+    def fill_small_mask_holes(mask_image: Image.Image, max_hole_size: int = 64) -> Image.Image:
+        """白地マスク内の小さな黒い穴を埋める。"""
+        if max_hole_size <= 0:
+            return mask_image.convert("L")
+
+        mask = mask_image.convert("L")
+        data = np.array(mask, dtype=np.uint8)
+        black = data < 128
+        height, width = black.shape
+        visited = np.zeros_like(black, dtype=bool)
+
+        for y in range(height):
+            for x in range(width):
+                if not black[y, x] or visited[y, x]:
+                    continue
+
+                queue = deque([(x, y)])
+                component = []
+                touches_border = False
+                visited[y, x] = True
+
+                while queue:
+                    cx, cy = queue.popleft()
+                    component.append((cx, cy))
+
+                    if cx == 0 or cy == 0 or cx == width - 1 or cy == height - 1:
+                        touches_border = True
+
+                    for nx, ny in (
+                        (cx - 1, cy),
+                        (cx + 1, cy),
+                        (cx, cy - 1),
+                        (cx, cy + 1),
+                    ):
+                        if 0 <= nx < width and 0 <= ny < height:
+                            if black[ny, nx] and not visited[ny, nx]:
+                                visited[ny, nx] = True
+                                queue.append((nx, ny))
+
+                if not touches_border and len(component) <= max_hole_size:
+                    for px, py in component:
+                        data[py, px] = 255
+
+        return Image.fromarray(data, "L")
+
+    @staticmethod
+    def expand_mask(mask_image: Image.Image, pixels: int = 0) -> Image.Image:
+        """白地マスクを指定ピクセル分だけ膨張させる。"""
+        if pixels <= 0:
+            return mask_image.convert("L")
+
+        mask = mask_image.convert("L")
+        for _ in range(pixels):
+            mask = mask.filter(ImageFilter.MaxFilter(3))
+        return mask
+
+    @staticmethod
+    def refine_alpha_mask(
+        mask_image: Image.Image,
+        fill_small_holes: bool = True,
+        hole_size_threshold: int = 64,
+        expand_pixels: int = 0,
+    ) -> Image.Image:
+        """Alpha マスクの小穴埋めと膨張をまとめて適用する。"""
+        refined = mask_image.convert("L")
+        if fill_small_holes:
+            refined = ImageProcessor.fill_small_mask_holes(
+                refined,
+                max_hole_size=hole_size_threshold,
+            )
+        if expand_pixels > 0:
+            refined = ImageProcessor.expand_mask(refined, pixels=expand_pixels)
+        return refined
 
     @staticmethod
     def get_image_size(image: Image.Image) -> Tuple[int, int]:

@@ -81,12 +81,27 @@ class PortraitureDB:
         self.save()
         return True
 
+    def update_subcategory_mask_image(
+        self,
+        category_name: str,
+        subcategory_name: str,
+        mask_image_path: Optional[str],
+    ) -> bool:
+        """サブカテゴリのマスク画像を更新する。"""
+        subcategory = self.get_subcategory(category_name, subcategory_name)
+        if subcategory is None:
+            return False
+        subcategory["mask_image"] = mask_image_path
+        self.save()
+        return True
+
     def add_subcategory(
         self,
         category_name: str,
         subcategory_name: str,
         background_path: Optional[str] = None,
         guide_image_path: Optional[str] = None,
+        mask_image_path: Optional[str] = None,
     ) -> bool:
         """サブカテゴリを追加する。"""
         category = self.get_category(category_name)
@@ -100,6 +115,7 @@ class PortraitureDB:
                 "name": subcategory_name,
                 "background": background_path,
                 "guide_image": guide_image_path,
+                "mask_image": mask_image_path,
                 "characters": [],
             }
         )
@@ -162,6 +178,9 @@ class PortraitureDB:
                     changed = True
                 if "guide_image" not in subcategory:
                     subcategory["guide_image"] = None
+                    changed = True
+                if "mask_image" not in subcategory:
+                    subcategory["mask_image"] = None
                     changed = True
                 if "characters" not in subcategory:
                     subcategory["characters"] = []

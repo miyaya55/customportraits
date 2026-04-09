@@ -9,6 +9,8 @@ test_output/
 customportrait/
 build/
 dist/
+build_rebuild/
+dist_rebuild/
 
 data/*.json
 !data/.gitkeep

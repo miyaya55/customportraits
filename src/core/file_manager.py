@@ -47,6 +47,28 @@ class FileManager:
             return None
 
     @staticmethod
+    def create_named_output_directory(
+        category: str,
+        subcategory: str,
+        folder_name: str,
+    ) -> Optional[str]:
+        """
+        固定名の出力ディレクトリを作成
+        構造: customportrait/category/subcategory/folder_name/
+        """
+        try:
+            normalized_name = folder_name.strip()
+            if not normalized_name:
+                return None
+
+            output_dir = Path("customportrait") / category / subcategory / normalized_name
+            output_dir.mkdir(parents=True, exist_ok=True)
+            return str(output_dir)
+        except Exception as e:
+            print(f"固定ディレクトリ作成エラー: {e}")
+            return None
+
+    @staticmethod
     def get_next_filename(output_dir: str, format: str = "PNG") -> str:
         """
         出力ファイルの次のファイル名を取得
@@ -78,3 +100,8 @@ class FileManager:
         画像ファイルが存在するか確認
         """
         return Path(image_path).exists() and Path(image_path).is_file()
+
+    @staticmethod
+    def get_alpha_filename(filename: str) -> str:
+        path = Path(filename)
+        return f"{path.stem}_Alpha{path.suffix}"

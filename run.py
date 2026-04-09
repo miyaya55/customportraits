@@ -13,7 +13,7 @@ sys.path.insert(0, str(project_root))
 
 if __name__ == "__main__":
     try:
-        from src.main import main
+        from src.app_main import main
         main()
     except Exception as e:
         print(f"Error: {e}")

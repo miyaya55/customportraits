@@ -126,6 +126,7 @@ class SubcategoryDialog(QDialog):
         super().__init__(parent)
         self.background_path = None
         self.guide_image_path = None
+        self.mask_image_path = None
         self.init_ui()
 
     def init_ui(self):
@@ -154,6 +155,16 @@ class SubcategoryDialog(QDialog):
                 on_pick=self.select_guide_image,
                 on_drop=self.set_guide_image_path,
                 attr_name="guide_preview",
+            )
+        )
+
+        layout.addLayout(
+            self._build_image_selector(
+                title="固定マスク画像（任意）",
+                empty_text="固定マスク画像を選択するか、ここへドラッグ&ドロップしてください",
+                on_pick=self.select_mask_image,
+                on_drop=self.set_mask_image_path,
+                attr_name="mask_preview",
             )
         )
 
@@ -216,11 +227,21 @@ class SubcategoryDialog(QDialog):
         self.guide_image_path = file_path or None
         self.guide_preview.show_image(self.guide_image_path)
 
+    def select_mask_image(self):
+        file_path = self._select_image_file("固定マスク画像を選択")
+        if file_path:
+            self.set_mask_image_path(file_path)
+
+    def set_mask_image_path(self, file_path: str):
+        self.mask_image_path = file_path or None
+        self.mask_preview.show_image(self.mask_image_path)
+
     def get_data(self):
         return {
             "name": self.name_input.text().strip(),
             "background": self.background_path,
             "guide_image": self.guide_image_path,
+            "mask_image": self.mask_image_path,
         }
 
 
@@ -278,11 +299,14 @@ class MainWindow(QMainWindow):
         edit_bg_btn.clicked.connect(self.edit_subcategory_background)
         edit_guide_btn = QPushButton("位置ガイド変更")
         edit_guide_btn.clicked.connect(self.edit_subcategory_guide_image)
+        edit_mask_btn = QPushButton("固定マスク変更")
+        edit_mask_btn.clicked.connect(self.edit_subcategory_mask_image)
         del_subcat_btn = QPushButton("サブカテゴリ削除")
         del_subcat_btn.clicked.connect(self.delete_subcategory)
         subcategory_button_layout.addWidget(add_subcat_btn)
         subcategory_button_layout.addWidget(edit_bg_btn)
         subcategory_button_layout.addWidget(edit_guide_btn)
+        subcategory_button_layout.addWidget(edit_mask_btn)
         subcategory_button_layout.addWidget(del_subcat_btn)
         subcategory_layout.addLayout(subcategory_button_layout)
 
@@ -397,6 +421,7 @@ class MainWindow(QMainWindow):
             data["name"],
             data["background"],
             data["guide_image"],
+            data["mask_image"],
         ):
             self.refresh_subcategory_list()
             QMessageBox.information(self, "成功", "サブカテゴリを追加しました")
@@ -475,6 +500,23 @@ class MainWindow(QMainWindow):
             return
 
         QMessageBox.warning(self, "警告", "位置ガイド画像の更新に失敗しました")
+
+    def edit_subcategory_mask_image(self):
+        category_name, subcategory_name = self._get_selected_subcategory_names()
+        if not category_name or not subcategory_name:
+            QMessageBox.warning(self, "注意", "カテゴリとサブカテゴリを選択してください")
+            return
+
+        file_path = self._select_image_file(f"固定マスク画像を選択 {subcategory_name}")
+        if not file_path:
+            return
+
+        if self.db.update_subcategory_mask_image(category_name, subcategory_name, file_path):
+            self.subcategory_selected.emit(category_name, subcategory_name)
+            QMessageBox.information(self, "完了", "固定マスク画像を更新しました")
+            return
+
+        QMessageBox.warning(self, "注意", "固定マスク画像の更新に失敗しました")
 
     def on_character_registration(self):
         category_name, subcategory_name = self._get_selected_subcategory_names()

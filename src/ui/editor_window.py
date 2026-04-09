@@ -11,12 +11,13 @@ from PyQt5.QtWidgets import (
     QLabel,
     QSlider,
     QSpinBox,
+    QLineEdit,
     QFileDialog,
     QMessageBox,
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QRect
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QRect, QTimer
 from PyQt5.QtGui import QImage, QPixmap, QMouseEvent, QPainter, QColor, QPen
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from src.core.image_processor import ImageProcessor
 from src.utils.constants import EDITOR_WINDOW_WIDTH, EDITOR_WINDOW_HEIGHT
@@ -33,6 +34,7 @@ class CharacterCanvas(QLabel):
     def __init__(self):
         super().__init__()
         self.image = None
+        self._checkerboard_cache = {}
         self.crop_rect = None
         self.is_cropping = False
         self.crop_start = None
@@ -86,8 +88,15 @@ class CharacterCanvas(QLabel):
     def set_pixmap_from_pil(self, pil_image: Image.Image, draw_crop=True):
         """PIL Image から QLabel 表示用の QPixmap を作る"""
         if pil_image.mode == "RGBA":
-            data = pil_image.tobytes("raw", "RGBA")
-            qimage = QImage(data, pil_image.width, pil_image.height, QImage.Format_RGBA8888)
+            preview_image = self._build_checkerboard(pil_image.size)
+            preview_image.alpha_composite(pil_image)
+            data = preview_image.tobytes("raw", "RGBA")
+            qimage = QImage(
+                data,
+                preview_image.width,
+                preview_image.height,
+                QImage.Format_RGBA8888,
+            )
         else:
             data = pil_image.tobytes("raw", "RGB")
             qimage = QImage(data, pil_image.width, pil_image.height, QImage.Format_RGB888)
@@ -108,6 +117,35 @@ class CharacterCanvas(QLabel):
             painter.end()
 
         self.setPixmap(scaled_pixmap)
+
+    def _build_checkerboard(self, size, cell_size=16):
+        """透過確認用の市松背景を生成する。"""
+        cache_key = (size, cell_size)
+        cached = self._checkerboard_cache.get(cache_key)
+        if cached is not None:
+            return cached.copy()
+
+        width, height = size
+        board = Image.new("RGBA", size, (0, 0, 0, 255))
+        draw = ImageDraw.Draw(board)
+        light = (238, 238, 238, 255)
+        dark = (210, 210, 210, 255)
+
+        for y in range(0, height, cell_size):
+            for x in range(0, width, cell_size):
+                color = light if ((x // cell_size) + (y // cell_size)) % 2 == 0 else dark
+                draw.rectangle(
+                    (
+                        x,
+                        y,
+                        min(x + cell_size - 1, width - 1),
+                        min(y + cell_size - 1, height - 1),
+                    ),
+                    fill=color,
+                )
+
+        self._checkerboard_cache[cache_key] = board
+        return board.copy()
 
     def _pixmap_rect(self):
         """ラベル内で実際に画像が表示されている矩形を返す"""
@@ -252,6 +290,8 @@ class EditorWindow(QWidget):
     image_updated = pyqtSignal(object)
     image_cleared = pyqtSignal()
     export_requested = pyqtSignal()
+    include_background_changed = pyqtSignal(bool)
+    mask_settings_changed = pyqtSignal(bool, int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -260,8 +300,15 @@ class EditorWindow(QWidget):
         self.preview_image = None
         self.original_image_path = None
         self.scale_percent = 100
+        self.scale_dragging = False
         self.last_crop_backup = None
+        self.fill_small_holes_enabled = True
+        self.mask_expand_pixels = 1
+        self.preview_update_timer = QTimer(self)
+        self.preview_update_timer.setSingleShot(True)
+        self.preview_update_timer.timeout.connect(self.refresh_preview)
         self.init_ui()
+        self.on_mask_setting_changed()
         self.setStyleSheet(STYLESHEET)
         self.canvas.image_dropped.connect(self.load_image_from_path)
         self.canvas.color_picked.connect(self.on_color_picked)
@@ -313,6 +360,8 @@ class EditorWindow(QWidget):
         self.scale_slider.setTickPosition(QSlider.TicksBelow)
         self.scale_slider.setEnabled(False)
         self.scale_slider.valueChanged.connect(self.on_scale_changed)
+        self.scale_slider.sliderPressed.connect(self.on_scale_slider_pressed)
+        self.scale_slider.sliderReleased.connect(self.on_scale_slider_released)
         scale_layout_h.addWidget(self.scale_slider, 4)
         self.scale_spinbox = QSpinBox()
         self.scale_spinbox.setMinimum(10)
@@ -356,7 +405,35 @@ class EditorWindow(QWidget):
         export_layout.addLayout(format_layout)
         self.include_bg_checkbox = QCheckBox("背景を含める")
         self.include_bg_checkbox.setChecked(True)
+        self.include_bg_checkbox.toggled.connect(self.include_background_changed.emit)
         export_layout.addWidget(self.include_bg_checkbox)
+        self.export_mask_checkbox = QCheckBox("Alphaマスクを自動生成して出力")
+        self.export_mask_checkbox.setChecked(False)
+        export_layout.addWidget(self.export_mask_checkbox)
+        self.fill_small_holes_checkbox = QCheckBox("Alphaマスクの小さい穴を埋める")
+        self.fill_small_holes_checkbox.setChecked(False)
+        self.fill_small_holes_checkbox.toggled.connect(self.on_mask_setting_changed)
+        export_layout.addWidget(self.fill_small_holes_checkbox)
+        mask_expand_layout = QHBoxLayout()
+        self.mask_expand_label = QLabel("Alphaマスク拡張 (px)")
+        self.mask_expand_label.setEnabled(False)
+        mask_expand_layout.addWidget(self.mask_expand_label)
+        self.mask_expand_spinbox = QSpinBox()
+        self.mask_expand_spinbox.setMinimum(0)
+        self.mask_expand_spinbox.setMaximum(2)
+        self.mask_expand_spinbox.setValue(1)
+        self.mask_expand_spinbox.setEnabled(False)
+        self.mask_expand_spinbox.valueChanged.connect(self.on_mask_setting_changed)
+        mask_expand_layout.addWidget(self.mask_expand_spinbox)
+        export_layout.addLayout(mask_expand_layout)
+        self.fixed_output_folder_checkbox = QCheckBox("出力先フォルダ名を固定")
+        self.fixed_output_folder_checkbox.setChecked(False)
+        self.fixed_output_folder_checkbox.toggled.connect(self.on_fixed_output_folder_toggled)
+        export_layout.addWidget(self.fixed_output_folder_checkbox)
+        self.fixed_output_folder_input = QLineEdit()
+        self.fixed_output_folder_input.setPlaceholderText("例: latest")
+        self.fixed_output_folder_input.setEnabled(False)
+        export_layout.addWidget(self.fixed_output_folder_input)
         self.export_btn = QPushButton("画像を出力")
         self.export_btn.clicked.connect(self.export_requested.emit)
         export_layout.addWidget(self.export_btn)
@@ -418,7 +495,7 @@ class EditorWindow(QWidget):
         self.scale_spinbox.blockSignals(False)
 
         self.enable_tools()
-        self.refresh_preview()
+        self.schedule_preview_refresh(immediate=True)
 
     def enable_tools(self):
         """ツールを有効にする"""
@@ -460,7 +537,7 @@ class EditorWindow(QWidget):
         self.scale_slider.blockSignals(False)
         self.scale_spinbox.blockSignals(False)
         self.disable_tools()
-        self.refresh_preview()
+        self.schedule_preview_refresh(immediate=True)
 
     def reset_crop_selection(self):
         """切り抜き選択状態をクリアする"""
@@ -471,6 +548,15 @@ class EditorWindow(QWidget):
         self.crop_apply_btn.setEnabled(False)
         self.crop_restore_btn.setEnabled(self.last_crop_backup is not None)
         self.canvas.update_display()
+
+    def schedule_preview_refresh(self, immediate: bool = False):
+        """プレビュー更新を少しまとめて、操作時の引っかかりを減らす。"""
+        if immediate:
+            self.preview_update_timer.stop()
+            self.refresh_preview()
+            return
+
+        self.preview_update_timer.start(16)
 
     def refresh_preview(self):
         """現在の編集状態からプレビューを再生成する"""
@@ -483,7 +569,16 @@ class EditorWindow(QWidget):
         if self.scale_percent == 100:
             self.preview_image = self.base_image.copy()
         else:
-            self.preview_image = ImageProcessor.scale_image(self.base_image, self.scale_percent)
+            resampling = (
+                Image.Resampling.BILINEAR
+                if self.scale_dragging
+                else Image.Resampling.LANCZOS
+            )
+            self.preview_image = ImageProcessor.scale_image(
+                self.base_image,
+                self.scale_percent,
+                resampling=resampling,
+            )
 
         self.canvas.set_image(self.preview_image)
         self.image_updated.emit(self.preview_image.copy())
@@ -512,7 +607,7 @@ class EditorWindow(QWidget):
         self.base_image = self.last_crop_backup.copy()
         self.last_crop_backup = None
         self.reset_crop_selection()
-        self.refresh_preview()
+        self.schedule_preview_refresh(immediate=True)
 
     def apply_crop(self):
         """切り抜きを適用する"""
@@ -541,7 +636,7 @@ class EditorWindow(QWidget):
         self.base_image = ImageProcessor.crop_image(self.base_image, base_box)
         self.canvas.clear_interaction_state()
         self.reset_crop_selection()
-        self.refresh_preview()
+        self.schedule_preview_refresh(immediate=True)
 
     def on_scale_changed(self, value):
         """スライダー変更時に即時反映する"""
@@ -549,7 +644,7 @@ class EditorWindow(QWidget):
         self.scale_spinbox.setValue(value)
         self.scale_spinbox.blockSignals(False)
         self.scale_percent = value
-        self.refresh_preview()
+        self.schedule_preview_refresh()
 
     def on_scale_spinbox_changed(self, value):
         """スピンボックス変更時に即時反映する"""
@@ -557,7 +652,14 @@ class EditorWindow(QWidget):
         self.scale_slider.setValue(value)
         self.scale_slider.blockSignals(False)
         self.scale_percent = value
-        self.refresh_preview()
+        self.schedule_preview_refresh(immediate=True)
+
+    def on_scale_slider_pressed(self):
+        self.scale_dragging = True
+
+    def on_scale_slider_released(self):
+        self.scale_dragging = False
+        self.schedule_preview_refresh(immediate=True)
 
     def toggle_alpha_mode(self):
         """色選択モードの切り替え"""
@@ -583,7 +685,7 @@ class EditorWindow(QWidget):
         self.alpha_status_label.setText(
             f"RGB{color} を簡易透過しました。必要ならもう一度開始してください"
         )
-        self.refresh_preview()
+        self.schedule_preview_refresh(immediate=True)
 
     def apply_flip(self):
         """左右反転を適用する"""
@@ -591,7 +693,7 @@ class EditorWindow(QWidget):
             return
 
         self.base_image = ImageProcessor.flip_horizontal(self.base_image)
-        self.refresh_preview()
+        self.schedule_preview_refresh(immediate=True)
 
     def get_edited_image(self):
         """現在の編集済み画像を返す"""
@@ -606,3 +708,37 @@ class EditorWindow(QWidget):
     def should_include_background(self):
         """背景を含めて出力するか返す。"""
         return self.include_bg_checkbox.isChecked()
+
+    def should_export_mask(self):
+        return self.export_mask_checkbox.isChecked()
+
+    def on_mask_setting_changed(self):
+        self.fill_small_holes_enabled = self.fill_small_holes_checkbox.isChecked()
+        self.mask_expand_label.setEnabled(self.fill_small_holes_enabled)
+        self.mask_expand_spinbox.setEnabled(self.fill_small_holes_enabled)
+        self.mask_expand_pixels = (
+            self.mask_expand_spinbox.value() if self.fill_small_holes_enabled else 0
+        )
+        self.mask_settings_changed.emit(
+            self.fill_small_holes_enabled,
+            self.mask_expand_pixels,
+        )
+
+    def get_mask_processing_settings(self):
+        return {
+            "fill_small_holes": self.fill_small_holes_checkbox.isChecked(),
+            "expand_pixels": (
+                self.mask_expand_spinbox.value()
+                if self.fill_small_holes_checkbox.isChecked()
+                else 0
+            ),
+        }
+
+    def on_fixed_output_folder_toggled(self, checked):
+        self.fixed_output_folder_input.setEnabled(bool(checked))
+
+    def should_use_fixed_output_folder(self):
+        return self.fixed_output_folder_checkbox.isChecked()
+
+    def get_fixed_output_folder_name(self):
+        return self.fixed_output_folder_input.text().strip()
