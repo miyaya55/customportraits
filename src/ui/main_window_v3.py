@@ -354,7 +354,7 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(subcategory_group)
 
         character_layout = QHBoxLayout()
-        self.char_registration_btn = QPushButton("キャラクター画像作成")
+        self.char_registration_btn = QPushButton("カスタムポートレート作成")
         self.char_registration_btn.setProperty("buttonRole", "primary")
         self.char_registration_btn.clicked.connect(self.on_character_registration)
         self.char_registration_btn.setEnabled(False)
