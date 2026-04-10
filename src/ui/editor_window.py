@@ -34,6 +34,7 @@ class CharacterCanvas(QLabel):
     def __init__(self):
         super().__init__()
         self.image = None
+        self.placeholder_text = "ここに画像をドラッグしてください\nまたは右側の「画像を選択」をクリック"
         self._checkerboard_cache = {}
         self.crop_rect = None
         self.is_cropping = False
@@ -43,7 +44,9 @@ class CharacterCanvas(QLabel):
         self.setMinimumSize(500, 500)
         self.setStyleSheet("border: 1px solid #cccccc; background-color: #ffffff;")
         self.setAlignment(Qt.AlignCenter)
+        self.setWordWrap(True)
         self.setAcceptDrops(True)
+        self.show_placeholder()
 
     def dragEnterEvent(self, event):
         """ドラッグ中のファイルを受け付ける"""
@@ -78,7 +81,12 @@ class CharacterCanvas(QLabel):
         if self.image:
             self.set_pixmap_from_pil(self.image)
         else:
-            self.clear()
+            self.show_placeholder()
+
+    def show_placeholder(self):
+        """画像未読み込み時の案内文を表示する"""
+        self.clear()
+        self.setText(self.placeholder_text)
 
     def resizeEvent(self, event):
         """リサイズ時に表示画像も更新する"""
@@ -351,7 +359,7 @@ class EditorWindow(QWidget):
         crop_group.setLayout(crop_layout)
         tool_layout.addWidget(crop_group)
 
-        scale_group = QGroupBox("拡大 / 縮小")
+        scale_group = QGroupBox("ビュー上のキャラサイズ調整")
         scale_layout = QVBoxLayout()
         scale_layout.addWidget(QLabel("スケール (%)"))
         scale_layout_h = QHBoxLayout()
@@ -373,7 +381,7 @@ class EditorWindow(QWidget):
         self.scale_spinbox.valueChanged.connect(self.on_scale_spinbox_changed)
         scale_layout_h.addWidget(self.scale_spinbox, 1)
         scale_layout.addLayout(scale_layout_h)
-        scale_layout.addWidget(QLabel("変更はその場でビューに反映されます"))
+        scale_layout.addWidget(QLabel("ビューに表示されるキャラクターの大きさを調整します"))
         scale_group.setLayout(scale_layout)
         tool_layout.addWidget(scale_group)
 
@@ -403,8 +411,16 @@ class EditorWindow(QWidget):
         format_layout.addWidget(QLabel("出力形式:"))
         self.format_combo = QComboBox()
         self.format_combo.addItems(["PNG", "BMP"])
+        self.format_combo.currentTextChanged.connect(self.on_output_format_changed)
         format_layout.addWidget(self.format_combo)
         export_layout.addLayout(format_layout)
+        self.format_warning_label = QLabel(
+            "BMP は透過状態が維持されない場合があります。必要に応じて Alpha マスクと組み合わせてください"
+        )
+        self.format_warning_label.setWordWrap(True)
+        self.format_warning_label.setStyleSheet("color: #c62828; font-weight: bold;")
+        self.format_warning_label.hide()
+        export_layout.addWidget(self.format_warning_label)
         self.include_bg_checkbox = QCheckBox("背景を含める")
         self.include_bg_checkbox.setChecked(True)
         self.include_bg_checkbox.toggled.connect(self.include_background_changed.emit)
@@ -450,6 +466,7 @@ class EditorWindow(QWidget):
         self.setLayout(main_layout)
         self.setWindowTitle("キャラクター編集")
         self.setGeometry(100, 100, EDITOR_WINDOW_WIDTH, EDITOR_WINDOW_HEIGHT)
+        self.on_output_format_changed(self.format_combo.currentText())
 
     def load_image(self):
         """ファイルダイアログから画像を読み込む"""
@@ -708,6 +725,10 @@ class EditorWindow(QWidget):
     def get_output_format(self):
         """選択中の出力形式を返す。"""
         return self.format_combo.currentText()
+
+    def on_output_format_changed(self, output_format: str):
+        """出力形式に応じた補助メッセージを切り替える。"""
+        self.format_warning_label.setVisible(output_format.upper() == "BMP")
 
     def should_include_background(self):
         """背景を含めて出力するか返す。"""
