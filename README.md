@@ -6,7 +6,7 @@
 
 ## ダウンロード
 
-- 普通に使うだけなら、GitHub Releases から `CustomPortraitTool.exe` をダウンロードして起動するのがおすすめです
+- 普通に使うだけなら、GitHub Releases から `CustomPortraitTool.exe` をダウンロードして起動してください
 - Releases ページ: `https://github.com/miyaya55/customportraits/releases`
 - ソースコードを編集したい人や、自分で exe を作りたい人だけ、下の `ソースコードから使う場合` を参照してください
 
@@ -18,33 +18,6 @@
 
 - 初回起動時は Windows の警告が出る場合があります
 - 出力画像や設定ファイルは、実行したフォルダを基準に作成されます
-- 配布相手が Python に詳しくない場合は、exe 版の利用をおすすめします
-
-## README に画像を載せる方法
-
-- 画像は `docs/images/` フォルダに入れておくと整理しやすいです
-- README では、次のように書くと画像を表示できます
-
-```md
-![メイン画面](docs/images/main-window.png)
-```
-
-- 見出し付きで並べたい場合は、次のように書けます
-
-```md
-### メイン画面
-![メイン画面](docs/images/main-window.png)
-```
-
-- ファイル名は半角英数字とハイフン区切りにしておくと扱いやすいです
-- 例: `main-window.png`, `editor-window.png`, `viewer-window.png`
-
-## リリース情報
-
-- 初回公開版のバージョン番号は `v1.0.0` です
-- GitHub Releases のタイトルは `v1.0.0` 形式をおすすめします
-- Release 本文のたたき台は [`RELEASE_NOTES_v1.0.0.md`](RELEASE_NOTES_v1.0.0.md) をそのまま使えます
-- Releases への載せ方は [`RELEASE_GUIDE.md`](RELEASE_GUIDE.md) にまとめています
 
 ## 概要
 
@@ -101,12 +74,6 @@
 - メモリ: `8GB 以上推奨`
 - 空き容量: `500MB 以上推奨`
 - 画面解像度: `1280x720 以上推奨`
-
-#### 最低限の目安
-
-- OS: `Windows 10 64bit`
-- メモリ: `4GB`
-- 空き容量: `300MB 程度`
 
 #### 非推奨 / 非対応
 
