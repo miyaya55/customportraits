@@ -95,6 +95,28 @@ class PortraitureDB:
         self.save()
         return True
 
+    def update_subcategory_output_settings(
+        self,
+        category_name: str,
+        subcategory_name: str,
+        *,
+        use_common_output_folder: bool,
+        use_fixed_output_folder: bool,
+        output_folder_name: str,
+        output_filename: str,
+    ) -> bool:
+        """サブカテゴリごとの出力設定を更新する。"""
+        subcategory = self.get_subcategory(category_name, subcategory_name)
+        if subcategory is None:
+            return False
+
+        subcategory["use_common_output_folder"] = bool(use_common_output_folder)
+        subcategory["use_fixed_output_folder"] = bool(use_fixed_output_folder)
+        subcategory["output_folder_name"] = output_folder_name.strip()
+        subcategory["output_filename"] = output_filename.strip()
+        self.save()
+        return True
+
     def add_subcategory(
         self,
         category_name: str,
@@ -116,6 +138,10 @@ class PortraitureDB:
                 "background": background_path,
                 "guide_image": guide_image_path,
                 "mask_image": mask_image_path,
+                "use_common_output_folder": False,
+                "use_fixed_output_folder": False,
+                "output_folder_name": "",
+                "output_filename": "",
                 "characters": [],
             }
         )
@@ -184,6 +210,18 @@ class PortraitureDB:
                     changed = True
                 if "characters" not in subcategory:
                     subcategory["characters"] = []
+                    changed = True
+                if "use_common_output_folder" not in subcategory:
+                    subcategory["use_common_output_folder"] = False
+                    changed = True
+                if "use_fixed_output_folder" not in subcategory:
+                    subcategory["use_fixed_output_folder"] = False
+                    changed = True
+                if "output_folder_name" not in subcategory:
+                    subcategory["output_folder_name"] = ""
+                    changed = True
+                if "output_filename" not in subcategory:
+                    subcategory["output_filename"] = ""
                     changed = True
 
         if changed:

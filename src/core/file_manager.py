@@ -1,11 +1,16 @@
 """ファイル操作モジュール"""
 
+import re
 from pathlib import Path
 from typing import Optional
 
 
 class FileManager:
     """ファイル操作クラス"""
+    INVALID_NAME_CHARS = '<>:"/\\|?*'
+    SERIAL_TOKENS = ("{連番}", "{n}", "{num}")
+    SERIAL_PATTERN = re.compile(r"\[(0?)(\d+)\]")
+    COMMON_FOLDER_NAME = "output"
 
     @staticmethod
     def get_next_output_folder(base_path: str) -> str:
@@ -31,13 +36,21 @@ class FileManager:
         return str(next_num).zfill(3)
 
     @staticmethod
-    def create_output_directory(category: str, subcategory: str) -> Optional[str]:
+    def create_output_directory(
+        category: str,
+        subcategory: str,
+        use_common_output_folder: bool = False,
+    ) -> Optional[str]:
         """
         出力ディレクトリを作成
         構造: customportrait/category/subcategory/001/
         """
         try:
-            base_path = Path("customportrait") / category / subcategory
+            base_path = FileManager.get_output_base_path(
+                category,
+                subcategory,
+                use_common_output_folder=use_common_output_folder,
+            )
             next_folder = FileManager.get_next_output_folder(str(base_path))
             output_dir = base_path / next_folder
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -51,6 +64,7 @@ class FileManager:
         category: str,
         subcategory: str,
         folder_name: str,
+        use_common_output_folder: bool = False,
     ) -> Optional[str]:
         """
         固定名の出力ディレクトリを作成
@@ -61,7 +75,15 @@ class FileManager:
             if not normalized_name:
                 return None
 
-            output_dir = Path("customportrait") / category / subcategory / normalized_name
+            base_dir = FileManager.get_output_base_path(
+                category,
+                subcategory,
+                use_common_output_folder=use_common_output_folder,
+            )
+            base_dir.mkdir(parents=True, exist_ok=True)
+
+            output_name = FileManager.resolve_serial_folder_name(base_dir, normalized_name)
+            output_dir = base_dir / output_name
             output_dir.mkdir(parents=True, exist_ok=True)
             return str(output_dir)
         except Exception as e:
@@ -95,6 +117,66 @@ class FileManager:
         return f"{str(next_num).zfill(3)}{ext}"
 
     @staticmethod
+    def is_valid_name(name: str) -> bool:
+        """Windows で使えるフォルダ名 / ファイル名か確認"""
+        normalized = name.strip()
+        if not normalized:
+            return False
+
+        return not any(char in FileManager.INVALID_NAME_CHARS for char in normalized)
+
+    @staticmethod
+    def build_output_filename(base_name: str, format: str = "PNG") -> str:
+        """指定名から出力ファイル名を生成"""
+        ext = ".png" if format.upper() == "PNG" else ".bmp"
+        return f"{base_name.strip()}{ext}"
+
+    @staticmethod
+    def get_output_base_path(
+        category: str,
+        subcategory: str,
+        use_common_output_folder: bool = False,
+    ) -> Path:
+        """出力の基準フォルダを返す"""
+        leaf = FileManager.COMMON_FOLDER_NAME if use_common_output_folder else subcategory
+        return Path("customportrait") / category / leaf
+
+    @staticmethod
+    def resolve_serial_folder_name(base_dir: Path, folder_name: str) -> str:
+        """連番トークンが含まれる場合は次のフォルダ名へ展開する"""
+        match = FileManager.SERIAL_PATTERN.search(folder_name)
+        if match:
+            token = match.group(0)
+            prefix, suffix = folder_name.split(token, 1)
+            pad_char = match.group(1)
+            width = max(1, int(match.group(2)))
+        else:
+            token = next((item for item in FileManager.SERIAL_TOKENS if item in folder_name), None)
+            if token is None:
+                return folder_name
+            prefix, suffix = folder_name.split(token, 1)
+            pad_char = "0"
+            width = 3
+
+        pattern = re.compile(rf"^{re.escape(prefix)}(\d+){re.escape(suffix)}$")
+        next_number = 1
+
+        for directory in base_dir.iterdir():
+            if not directory.is_dir():
+                continue
+
+            match = pattern.match(directory.name)
+            if match:
+                next_number = max(next_number, int(match.group(1)) + 1)
+
+        if pad_char == "0":
+            serial = str(next_number).rjust(width, pad_char)
+        else:
+            serial = str(next_number)
+
+        return f"{prefix}{serial}{suffix}"
+
+    @staticmethod
     def validate_image_path(image_path: str) -> bool:
         """
         画像ファイルが存在するか確認
@@ -105,3 +187,8 @@ class FileManager:
     def get_alpha_filename(filename: str) -> str:
         path = Path(filename)
         return f"{path.stem}_Alpha{path.suffix}"
+
+    @staticmethod
+    def get_custom_alpha_filename(filename: str) -> str:
+        path = Path(filename)
+        return f"{path.stem}Alpha{path.suffix}"

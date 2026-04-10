@@ -146,6 +146,10 @@ pip install -r requirements.txt
 - 表示されたビューに対してキャラクター画像を読み込ませ、切り抜きや拡大縮小、簡易背景透過、左右反転などを行います。
 - キャラクター画像は、背景が透過済みであることを想定した作りになっています。
 - 簡易背景透過の精度は高くないため、できれば前もって透過済みの画像を使用するのがおすすめです。
+- 左側には最近使った画像のサムネイル履歴が最大 10 件まで縦に並び、クリックで読み込めます。
+- 出力に成功した画像は、最近使った画像として最大 10 件まで履歴から呼び出せます。
+- 履歴から読み込んだ場合は、そのとき使っていた出力設定も一緒に復元されます。
+- ただしファイル名は上書きせず、現在のサブカテゴリ側で設定している値をそのまま使います。
 
 ![キャラクター画像作成](docs/images/editor-window.png)
 
@@ -174,7 +178,10 @@ pip install -r requirements.txt
 - `背景を含めない` 場合は、背景に指定した解像度の透過画像にキャラクターのみが出力されます。
 - 出力先フォルダを指定しない場合は、`customport\\customportrait\\カテゴリ\\サブカテゴリ\\{連番}` 形式で出力されます。
 - 基本的に、最後に連番で出力したフォルダ番号を見て、それに `+1` したフォルダを作成します。
+- `カテゴリ共通フォルダに出力` を使うと、同じカテゴリ内の複数サブカテゴリの出力を `output` 配下にまとめられます。
 - 出力先フォルダを指定した場合は、その名前のフォルダを作成します。
+- フォルダ名は `latest[3]` や `latest[03]` のような連番指定にも対応しています。
+- ファイル名を指定した場合は、そのサブカテゴリ側へ保存され、次回開いたときも復元されます。
 
 ![画像出力](docs/images/export-area.png)
 
@@ -252,9 +259,9 @@ python src/main.py
 │   │   ├── image_processor.py   - 画像処理機能
 │   │   └── file_manager.py      - ファイル操作・出力管理
 │   ├── ui/
-│   │   ├── main_window.py       - メイン画面
+│   │   ├── main_window_v3.py    - メイン画面
 │   │   ├── editor_window.py     - キャラクター編集画面
-│   │   ├── viewer_window.py     - ビュー・プレビュー画面
+│   │   ├── viewer_window_v3.py  - ビュー・プレビュー画面
 │   │   └── styles.py            - UI スタイル定義
 │   └── utils/
 │       └── constants.py         - アプリケーション定数
@@ -277,6 +284,12 @@ python src/main.py
         {
           "name": "Scene Name",
           "background": "/path/to/background.png",
+          "guide_image": "/path/to/guide.png",
+          "mask_image": "/path/to/mask.png",
+          "use_common_output_folder": false,
+          "use_fixed_output_folder": false,
+          "output_folder_name": "",
+          "output_filename": "",
           "characters": []
         }
       ]
@@ -291,15 +304,31 @@ python src/main.py
   "output_format": "PNG",
   "include_background": true,
   "last_opened_category": null,
-  "last_opened_subcategory": null
+  "last_opened_subcategory": null,
+  "last_used_output_settings": {
+    "output_format": "PNG",
+    "include_background": true,
+    "use_common_output_folder": false,
+    "use_fixed_output_folder": false,
+    "output_folder_name": "",
+    "output_filename": ""
+  },
+  "recent_images": []
 }
 ```
 
 ## 固定出力先フォルダ
 
-- `出力先フォルダ名を固定` を ON にすると、連番フォルダではなく指定した名前のフォルダへ常に出力します
-- 例: フォルダ名を `latest` にすると、`customportrait/[カテゴリ]/[サブカテゴリ]/latest/` に出力されます
-- このモードでも画像ファイル名自体は連番で増えていきます
+- `カテゴリ共通フォルダに出力` を ON にすると、`customportrait/[カテゴリ]/output/` 配下へ出力します
+- 複数のサブカテゴリで出力した画像を、同じ共通フォルダ側へまとめたいときに使えます
+- `出力先フォルダ名を固定` を ON にすると、フォルダ名とファイル名を指定できます
+- フォルダ名を `latest` にすると、`customportrait/[カテゴリ]/[サブカテゴリ]/latest/` に常に出力します
+- `カテゴリ共通フォルダに出力` も ON の場合は、同じルールで `customportrait/[カテゴリ]/output/latest/` に出力します
+- フォルダ名を `latest[3]` にすると、`latest1`、`latest2` のように 0 埋めなしの連番フォルダを自動で作成します
+- フォルダ名を `latest[03]` にすると、`latest001`、`latest002` のように 3 桁 0 埋めの連番フォルダを自動で作成します
+- `ファイル名` を指定した場合は、そのサブカテゴリ内で保存され、次回開いたときにも同じ名前が表示されます
+- 設定の保存タイミングは、画像出力が成功したときです
+- Alpha マスクも出力する場合は、指定ファイル名の末尾に `Alpha` を付けた名前で保存します
 - 毎回同じ場所にまとめて出したいときや、ゲーム確認用の一時出力先を固定したいときに便利です
 
 

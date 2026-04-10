@@ -1,5 +1,7 @@
 """キャラクター編集画面 - 画像の読み込みと編集"""
 
+from pathlib import Path
+
 from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -14,9 +16,12 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QFileDialog,
     QMessageBox,
+    QListWidget,
+    QListWidgetItem,
+    QListView,
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QRect, QTimer
-from PyQt5.QtGui import QImage, QPixmap, QMouseEvent, QPainter, QColor, QPen
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QRect, QTimer, QSize
+from PyQt5.QtGui import QImage, QPixmap, QMouseEvent, QPainter, QColor, QPen, QIcon
 from PIL import Image, ImageDraw
 
 from src.core.image_processor import ImageProcessor
@@ -298,6 +303,7 @@ class EditorWindow(QWidget):
     image_updated = pyqtSignal(object)
     image_cleared = pyqtSignal()
     export_requested = pyqtSignal()
+    recent_image_requested = pyqtSignal(object)
     include_background_changed = pyqtSignal(bool)
     mask_settings_changed = pyqtSignal(bool, int)
 
@@ -325,6 +331,28 @@ class EditorWindow(QWidget):
     def init_ui(self):
         """UI を初期化"""
         main_layout = QHBoxLayout()
+
+        history_group = QGroupBox("最近使った画像")
+        history_layout = QVBoxLayout()
+        self.recent_image_list = QListWidget()
+        self.recent_image_list.setViewMode(QListView.IconMode)
+        self.recent_image_list.setFlow(QListView.TopToBottom)
+        self.recent_image_list.setWrapping(False)
+        self.recent_image_list.setResizeMode(QListView.Adjust)
+        self.recent_image_list.setMovement(QListView.Static)
+        self.recent_image_list.setIconSize(QSize(88, 88))
+        self.recent_image_list.setGridSize(QSize(110, 118))
+        self.recent_image_list.setSpacing(6)
+        self.recent_image_list.setWordWrap(True)
+        self.recent_image_list.setMinimumWidth(128)
+        self.recent_image_list.setMaximumWidth(148)
+        self.recent_image_list.itemClicked.connect(self.on_recent_image_item_clicked)
+        history_layout.addWidget(self.recent_image_list)
+        history_hint = QLabel("クリックで読込")
+        history_hint.setAlignment(Qt.AlignCenter)
+        history_layout.addWidget(history_hint)
+        history_group.setLayout(history_layout)
+        main_layout.addWidget(history_group, 0)
 
         canvas_layout = QVBoxLayout()
         canvas_layout.addWidget(self.canvas)
@@ -444,14 +472,31 @@ class EditorWindow(QWidget):
         self.mask_expand_spinbox.valueChanged.connect(self.on_mask_setting_changed)
         mask_expand_layout.addWidget(self.mask_expand_spinbox)
         export_layout.addLayout(mask_expand_layout)
+        self.common_output_folder_checkbox = QCheckBox("カテゴリ共通フォルダに出力")
+        self.common_output_folder_checkbox.setChecked(False)
+        self.common_output_folder_checkbox.toggled.connect(self.on_common_output_folder_toggled)
+        export_layout.addWidget(self.common_output_folder_checkbox)
         self.fixed_output_folder_checkbox = QCheckBox("出力先フォルダ名を固定")
         self.fixed_output_folder_checkbox.setChecked(False)
         self.fixed_output_folder_checkbox.toggled.connect(self.on_fixed_output_folder_toggled)
         export_layout.addWidget(self.fixed_output_folder_checkbox)
+        fixed_output_layout = QHBoxLayout()
+        fixed_output_layout.addWidget(QLabel("フォルダ名"))
         self.fixed_output_folder_input = QLineEdit()
-        self.fixed_output_folder_input.setPlaceholderText("例: latest")
+        self.fixed_output_folder_input.setPlaceholderText("例: latest / latest[3] / latest[03]")
         self.fixed_output_folder_input.setEnabled(False)
-        export_layout.addWidget(self.fixed_output_folder_input)
+        fixed_output_layout.addWidget(self.fixed_output_folder_input)
+        fixed_output_layout.addWidget(QLabel("ファイル名"))
+        self.fixed_output_filename_input = QLineEdit()
+        self.fixed_output_filename_input.setPlaceholderText("例: portrait")
+        self.fixed_output_filename_input.setEnabled(False)
+        fixed_output_layout.addWidget(self.fixed_output_filename_input)
+        export_layout.addLayout(fixed_output_layout)
+        fixed_output_help = QLabel(
+            "例: latest[3] は latest1 / latest2、latest[03] は latest001 / latest002 のように増えます。"
+        )
+        fixed_output_help.setWordWrap(True)
+        export_layout.addWidget(fixed_output_help)
         self.export_btn = QPushButton("画像を出力")
         self.export_btn.setProperty("buttonRole", "primary")
         self.export_btn.setMinimumHeight(44)
@@ -484,9 +529,10 @@ class EditorWindow(QWidget):
         image = ImageProcessor.load_image(file_path)
         if not image:
             QMessageBox.warning(self, "警告", "画像の読み込みに失敗しました")
-            return
+            return False
 
         self.set_image(image, original_image_path=file_path)
+        return True
 
     def set_image(self, image, original_image_path: str = None):
         """既存の PIL Image を編集対象として設定する"""
@@ -726,6 +772,11 @@ class EditorWindow(QWidget):
         """選択中の出力形式を返す。"""
         return self.format_combo.currentText()
 
+    def set_output_format(self, output_format: str):
+        index = self.format_combo.findText(output_format.upper())
+        if index >= 0:
+            self.format_combo.setCurrentIndex(index)
+
     def on_output_format_changed(self, output_format: str):
         """出力形式に応じた補助メッセージを切り替える。"""
         self.format_warning_label.setVisible(output_format.upper() == "BMP")
@@ -733,6 +784,9 @@ class EditorWindow(QWidget):
     def should_include_background(self):
         """背景を含めて出力するか返す。"""
         return self.include_bg_checkbox.isChecked()
+
+    def set_include_background(self, include_background: bool):
+        self.include_bg_checkbox.setChecked(bool(include_background))
 
     def should_export_mask(self):
         return self.export_mask_checkbox.isChecked()
@@ -761,9 +815,114 @@ class EditorWindow(QWidget):
 
     def on_fixed_output_folder_toggled(self, checked):
         self.fixed_output_folder_input.setEnabled(bool(checked))
+        self.fixed_output_filename_input.setEnabled(bool(checked))
+        self.on_common_output_folder_toggled(self.common_output_folder_checkbox.isChecked())
+
+    def on_common_output_folder_toggled(self, checked):
+        if checked and not self.fixed_output_filename_input.text().strip():
+            self.fixed_output_filename_input.setPlaceholderText("例: output")
+        else:
+            self.fixed_output_filename_input.setPlaceholderText("例: portrait")
 
     def should_use_fixed_output_folder(self):
         return self.fixed_output_folder_checkbox.isChecked()
 
+    def should_use_common_output_folder(self):
+        return self.common_output_folder_checkbox.isChecked()
+
     def get_fixed_output_folder_name(self):
         return self.fixed_output_folder_input.text().strip()
+
+    def get_fixed_output_filename(self):
+        return self.fixed_output_filename_input.text().strip()
+
+    def set_fixed_output_settings(
+        self,
+        *,
+        use_common_folder: bool = False,
+        enabled: bool = False,
+        folder_name: str = "",
+        filename: str = "",
+    ):
+        self.common_output_folder_checkbox.blockSignals(True)
+        self.common_output_folder_checkbox.setChecked(bool(use_common_folder))
+        self.common_output_folder_checkbox.blockSignals(False)
+        self.fixed_output_folder_checkbox.blockSignals(True)
+        self.fixed_output_folder_checkbox.setChecked(bool(enabled))
+        self.fixed_output_folder_checkbox.blockSignals(False)
+        self.fixed_output_folder_input.setText(folder_name or "")
+        self.fixed_output_filename_input.setText(filename or "")
+        self.on_fixed_output_folder_toggled(bool(enabled))
+
+    def set_export_settings(
+        self,
+        *,
+        output_format: str = "PNG",
+        include_background: bool = True,
+        use_common_folder: bool = False,
+        use_fixed_folder: bool = False,
+        folder_name: str = "",
+        filename: str = "",
+    ):
+        self.set_output_format(output_format)
+        self.set_include_background(include_background)
+        self.set_fixed_output_settings(
+            use_common_folder=use_common_folder,
+            enabled=use_fixed_folder,
+            folder_name=folder_name,
+            filename=filename,
+        )
+
+    def get_export_settings(self):
+        return {
+            "output_format": self.get_output_format(),
+            "include_background": self.should_include_background(),
+            "use_common_output_folder": self.should_use_common_output_folder(),
+            "use_fixed_output_folder": self.should_use_fixed_output_folder(),
+            "output_folder_name": self.get_fixed_output_folder_name(),
+            "output_filename": self.get_fixed_output_filename(),
+        }
+
+    def set_recent_images(self, recent_images):
+        self.recent_image_list.clear()
+        for item in recent_images:
+            image_path = item.get("image_path", "")
+            if not image_path:
+                continue
+            item_widget = QListWidgetItem(Path(image_path).stem)
+            item_widget.setData(Qt.UserRole, item)
+            item_widget.setToolTip(image_path)
+            item_widget.setTextAlignment(Qt.AlignCenter)
+            item_widget.setIcon(self.build_recent_image_icon(image_path))
+            self.recent_image_list.addItem(item_widget)
+
+    def build_recent_image_icon(self, image_path: str) -> QIcon:
+        pixmap = QPixmap(image_path)
+        if pixmap.isNull():
+            fallback = QPixmap(88, 88)
+            fallback.fill(QColor("#d9d9d9"))
+            painter = QPainter(fallback)
+            painter.setPen(QColor("#666666"))
+            painter.drawText(fallback.rect(), Qt.AlignCenter, "読込不可")
+            painter.end()
+            return QIcon(fallback)
+
+        scaled = pixmap.scaled(
+            88,
+            88,
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation,
+        )
+        thumbnail = QPixmap(88, 88)
+        thumbnail.fill(QColor("#f4f4f4"))
+        painter = QPainter(thumbnail)
+        x = (88 - scaled.width()) // 2
+        y = (88 - scaled.height()) // 2
+        painter.drawPixmap(x, y, scaled)
+        painter.end()
+        return QIcon(thumbnail)
+
+    def on_recent_image_item_clicked(self, item: QListWidgetItem):
+        recent_item = item.data(Qt.UserRole)
+        if recent_item:
+            self.recent_image_requested.emit(recent_item)

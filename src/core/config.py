@@ -25,6 +25,7 @@ class ConfigManager:
                 self.data = self._default_config()
         else:
             self.data = self._default_config()
+        self._normalize_config()
 
     def save(self) -> None:
         """設定ファイルに保存"""
@@ -48,7 +49,74 @@ class ConfigManager:
             "include_background": True,
             "last_opened_category": None,
             "last_opened_subcategory": None,
+            "last_used_output_settings": {
+                "output_format": "PNG",
+                "include_background": True,
+                "use_common_output_folder": False,
+                "use_fixed_output_folder": False,
+                "output_folder_name": "",
+                "output_filename": "",
+            },
+            "recent_images": [],
         }
+
+    def get_last_used_output_settings(self) -> Dict[str, Any]:
+        settings = self.data.get("last_used_output_settings", {})
+        defaults = self._default_config()["last_used_output_settings"]
+        merged = defaults.copy()
+        merged.update(settings)
+        return merged
+
+    def save_last_used_output_settings(self, settings: Dict[str, Any]) -> None:
+        merged = self.get_last_used_output_settings()
+        merged.update(settings)
+        self.data["last_used_output_settings"] = merged
+        self.save()
+
+    def get_recent_images(self) -> list:
+        recent_images = self.data.get("recent_images", [])
+        return recent_images if isinstance(recent_images, list) else []
+
+    def add_recent_image(self, item: Dict[str, Any], limit: int = 10) -> None:
+        image_path = item.get("image_path")
+        if not image_path:
+            return
+
+        history_item = dict(item)
+        history_item.pop("output_filename", None)
+
+        recent_images = [
+            existing for existing in self.get_recent_images()
+            if existing.get("image_path") != image_path
+        ]
+        recent_images.insert(0, history_item)
+        self.data["recent_images"] = recent_images[:limit]
+        self.save()
+
+    def _normalize_config(self) -> None:
+        defaults = self._default_config()
+        changed = False
+
+        for key, value in defaults.items():
+            if key not in self.data:
+                self.data[key] = value
+                changed = True
+
+        if not isinstance(self.data.get("recent_images"), list):
+            self.data["recent_images"] = []
+            changed = True
+
+        if not isinstance(self.data.get("last_used_output_settings"), dict):
+            self.data["last_used_output_settings"] = defaults["last_used_output_settings"].copy()
+            changed = True
+        else:
+            for key, value in defaults["last_used_output_settings"].items():
+                if key not in self.data["last_used_output_settings"]:
+                    self.data["last_used_output_settings"][key] = value
+                    changed = True
+
+        if changed:
+            self.save()
 
 
 class PortraitureDB:
