@@ -2,6 +2,8 @@
 
 ゲーム用のカスタムポートレート作成ツール
 
+現在の配布版: `v1.0.0`
+
 ## ダウンロード
 
 - 普通に使うだけなら、GitHub Releases から `CustomPortraitTool.exe` をダウンロードして起動するのがおすすめです
@@ -17,6 +19,13 @@
 - 初回起動時は Windows の警告が出る場合があります
 - 出力画像や設定ファイルは、実行したフォルダを基準に作成されます
 - 配布相手が Python に詳しくない場合は、exe 版の利用をおすすめします
+
+## リリース情報
+
+- 初回公開版のバージョン番号は `v1.0.0` です
+- GitHub Releases のタイトルは `v1.0.0` 形式をおすすめします
+- Release 本文のたたき台は [`RELEASE_NOTES_v1.0.0.md`](RELEASE_NOTES_v1.0.0.md) をそのまま使えます
+- Releases への載せ方は [`RELEASE_GUIDE.md`](RELEASE_GUIDE.md) にまとめています
 
 ## 概要
 
@@ -236,6 +245,7 @@ python src/main.py
 
 ## 開発者向け: exe ビルド
 
+- 配布バージョン番号は [`VERSION`](VERSION) で管理しています
 - `build_exe.bat` を実行すると exe をビルドできます
 - 生成先は `dist\CustomPortraitTool.exe` です
 - Python と依存パッケージが入っている環境で実行してください

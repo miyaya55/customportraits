@@ -20,7 +20,7 @@ from PyQt5.QtWidgets import (
 
 from src.core.portraiture_db import PortraitureDB
 from src.ui.styles import STYLESHEET
-from src.utils.constants import MAIN_WINDOW_HEIGHT, MAIN_WINDOW_WIDTH
+from src.utils.constants import APP_NAME, APP_VERSION, MAIN_WINDOW_HEIGHT, MAIN_WINDOW_WIDTH
 
 
 class ImageDropLabel(QLabel):
@@ -262,7 +262,7 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(STYLESHEET)
 
     def init_ui(self):
-        self.setWindowTitle("Custom Portrait Tool")
+        self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
         self.setGeometry(100, 100, MAIN_WINDOW_WIDTH, MAIN_WINDOW_HEIGHT)
 
         central_widget = QWidget()

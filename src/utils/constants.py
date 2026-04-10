@@ -1,8 +1,21 @@
 """アプリケーション定数定義"""
 
+from pathlib import Path
+
+
+def _load_app_version() -> str:
+    """Read the release version from the repository root."""
+    version_file = Path(__file__).resolve().parents[2] / "VERSION"
+    if version_file.exists():
+        version_text = version_file.read_text(encoding="utf-8").strip()
+        if version_text:
+            return version_text
+    return "1.0.0"
+
+
 # アプリケーション設定
 APP_NAME = "Custom Portrait Tool"
-APP_VERSION = "1.0.0"
+APP_VERSION = _load_app_version()
 
 # ファイル形式
 SUPPORTED_IMAGE_FORMATS = {
