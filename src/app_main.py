@@ -49,6 +49,7 @@ class CustomPortraitApp:
         self.main_window.character_registration_requested.connect(
             self.on_character_registration_requested
         )
+        self.main_window.window_closing.connect(self.on_main_window_closing)
         self.viewer_window.canvas.character_position_changed.connect(
             self.on_viewer_character_position_changed
         )
@@ -240,6 +241,10 @@ class CustomPortraitApp:
             folder_name=recent_item.get("output_folder_name", ""),
             filename=current_filename,
         )
+
+    def on_main_window_closing(self):
+        self.editor_window.close()
+        self.viewer_window.close()
 
     def export_portrait(self):
         if not self.current_category or not self.current_subcategory:

@@ -270,6 +270,7 @@ class MainWindow(QMainWindow):
 
     subcategory_selected = pyqtSignal(str, str)
     character_registration_requested = pyqtSignal(str, str)
+    window_closing = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -569,3 +570,7 @@ class MainWindow(QMainWindow):
 
     def enable_character_registration(self, enabled: bool):
         self.char_registration_btn.setEnabled(enabled)
+
+    def closeEvent(self, event):
+        self.window_closing.emit()
+        super().closeEvent(event)
