@@ -213,18 +213,10 @@ class CustomPortraitApp:
             )
             return
 
-        if export_mask:
-            display_image = self.viewer_window.get_export_image(
-                include_background=include_background,
-                apply_mask=False,
-            )
-        elif include_background:
-            display_image = self.viewer_window.get_export_image(
-                include_background=True,
-                apply_mask=False,
-            )
-        else:
-            display_image = self.edited_character_image.copy()
+        display_image = self.viewer_window.get_export_image(
+            include_background=include_background,
+            apply_mask=False,
+        )
 
         if display_image is None:
             QMessageBox.warning(

@@ -106,7 +106,7 @@ class CategoryDialog(QDialog):
         button_layout = QHBoxLayout()
         ok_btn = QPushButton("OK")
         ok_btn.setProperty("buttonRole", "primary")
-        ok_btn.clicked.connect(self.accept)
+        ok_btn.clicked.connect(self.validate_and_accept)
         cancel_btn = QPushButton("キャンセル")
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(ok_btn)
@@ -116,6 +116,14 @@ class CategoryDialog(QDialog):
         self.setLayout(layout)
         self.setWindowTitle("カテゴリ追加")
         self.setMinimumWidth(320)
+
+    def validate_and_accept(self):
+        """カテゴリ名の入力を確認してからダイアログを閉じる。"""
+        if not self.name_input.text().strip():
+            QMessageBox.warning(self, "入力エラー", "カテゴリ名を入力してください")
+            self.name_input.setFocus()
+            return
+        self.accept()
 
     def get_data(self):
         return {"name": self.name_input.text().strip()}
@@ -173,7 +181,7 @@ class SubcategoryDialog(QDialog):
         button_layout = QHBoxLayout()
         ok_btn = QPushButton("OK")
         ok_btn.setProperty("buttonRole", "primary")
-        ok_btn.clicked.connect(self.accept)
+        ok_btn.clicked.connect(self.validate_and_accept)
         cancel_btn = QPushButton("キャンセル")
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(ok_btn)
@@ -183,6 +191,14 @@ class SubcategoryDialog(QDialog):
         self.setLayout(layout)
         self.setWindowTitle("サブカテゴリ追加")
         self.setMinimumWidth(520)
+
+    def validate_and_accept(self):
+        """サブカテゴリ名の入力を確認してからダイアログを閉じる。"""
+        if not self.name_input.text().strip():
+            QMessageBox.warning(self, "入力エラー", "サブカテゴリ名を入力してください")
+            self.name_input.setFocus()
+            return
+        self.accept()
 
     def _build_image_selector(self, title, empty_text, on_pick, on_drop, attr_name):
         layout = QVBoxLayout()
