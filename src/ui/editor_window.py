@@ -35,6 +35,8 @@ class CharacterCanvas(QLabel):
     crop_region_changed = pyqtSignal()
     image_dropped = pyqtSignal(str)
     color_picked = pyqtSignal(tuple)
+    scale_wheel_requested = pyqtSignal(int)
+    scale_key_requested = pyqtSignal(int)
 
     def __init__(self):
         super().__init__()
@@ -51,6 +53,7 @@ class CharacterCanvas(QLabel):
         self.setAlignment(Qt.AlignCenter)
         self.setWordWrap(True)
         self.setAcceptDrops(True)
+        self.setFocusPolicy(Qt.StrongFocus)
         self.show_placeholder()
 
     def dragEnterEvent(self, event):
@@ -204,6 +207,7 @@ class CharacterCanvas(QLabel):
         return img_x, img_y
 
     def mousePressEvent(self, event: QMouseEvent):
+        self.setFocus()
         """マウスボタン押下時の処理"""
         if self.is_cropping and self.image:
             point = self._clamp_to_pixmap(event.pos())
@@ -245,6 +249,34 @@ class CharacterCanvas(QLabel):
             return
 
         super().mouseReleaseEvent(event)
+
+    def wheelEvent(self, event):
+        """キャンバス上のホイールで拡大縮小要求を送る"""
+        if not self.image:
+            super().wheelEvent(event)
+            return
+
+        delta_y = event.angleDelta().y()
+        if delta_y == 0:
+            super().wheelEvent(event)
+            return
+
+        self.scale_wheel_requested.emit(delta_y)
+        event.accept()
+
+    def keyPressEvent(self, event):
+        """キャンバス上の左右キーで微調整要求を送る"""
+        if self.image:
+            if event.key() == Qt.Key_Right:
+                self.scale_key_requested.emit(1)
+                event.accept()
+                return
+            if event.key() == Qt.Key_Left:
+                self.scale_key_requested.emit(-1)
+                event.accept()
+                return
+
+        super().keyPressEvent(event)
 
     def get_crop_region(self):
         """切り抜き領域を現在の表示画像座標で返す"""
@@ -327,6 +359,8 @@ class EditorWindow(QWidget):
         self.canvas.image_dropped.connect(self.load_image_from_path)
         self.canvas.color_picked.connect(self.on_color_picked)
         self.canvas.crop_region_changed.connect(self.on_crop_region_changed)
+        self.canvas.scale_wheel_requested.connect(self.on_scale_wheel_requested)
+        self.canvas.scale_key_requested.connect(self.on_scale_key_requested)
 
     def init_ui(self):
         """UI を初期化"""
@@ -562,6 +596,7 @@ class EditorWindow(QWidget):
         self.scale_spinbox.blockSignals(False)
 
         self.enable_tools()
+        self.canvas.setFocus()
         self.schedule_preview_refresh(immediate=True)
 
     def enable_tools(self):
@@ -727,6 +762,40 @@ class EditorWindow(QWidget):
     def on_scale_slider_released(self):
         self.scale_dragging = False
         self.schedule_preview_refresh(immediate=True)
+
+    def on_scale_wheel_requested(self, delta_y: int):
+        """マウスホイール量に応じてスケールを変更する"""
+        if not self.base_image or not self.scale_slider.isEnabled():
+            return
+
+        step_count = max(1, abs(delta_y) // 120)
+        direction = 1 if delta_y > 0 else -1
+        next_value = self.scale_percent + (direction * step_count * 5)
+        next_value = min(
+            self.scale_slider.maximum(),
+            max(self.scale_slider.minimum(), next_value),
+        )
+
+        if next_value == self.scale_percent:
+            return
+
+        self.scale_slider.setValue(next_value)
+
+    def on_scale_key_requested(self, step: int):
+        """左右キーに応じて 1% 単位でスケールを変更する"""
+        if not self.base_image or not self.scale_slider.isEnabled():
+            return
+
+        next_value = self.scale_percent + step
+        next_value = min(
+            self.scale_slider.maximum(),
+            max(self.scale_slider.minimum(), next_value),
+        )
+
+        if next_value == self.scale_percent:
+            return
+
+        self.scale_slider.setValue(next_value)
 
     def toggle_alpha_mode(self):
         """色選択モードの切り替え"""

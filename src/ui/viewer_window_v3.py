@@ -19,6 +19,8 @@ class ViewerCanvas(QLabel):
     """ビュー表示用キャンバス。"""
 
     character_position_changed = pyqtSignal(int, int)
+    scale_wheel_requested = pyqtSignal(int)
+    scale_key_requested = pyqtSignal(int)
 
     def __init__(self):
         super().__init__()
@@ -36,6 +38,7 @@ class ViewerCanvas(QLabel):
         self.dragging = False
         self.drag_start = None
         self.setStyleSheet("border: 1px solid #cccccc; background-color: #ffffff;")
+        self.setFocusPolicy(Qt.StrongFocus)
         self.set_canvas_size(VIEWER_WINDOW_WIDTH, VIEWER_WINDOW_HEIGHT)
 
     def set_canvas_size(self, width: int, height: int):
@@ -148,6 +151,7 @@ class ViewerCanvas(QLabel):
                 self.character_position = self._clamp_character_position(*self.character_position)
             else:
                 self.character_position = self._default_character_position()
+            self.setFocus()
         else:
             self.character_image = None
             self.character_position = (0, 0)
@@ -286,6 +290,7 @@ class ViewerCanvas(QLabel):
         return char_x <= x < char_x + char_w and char_y <= y < char_y + char_h
 
     def mousePressEvent(self, event: QMouseEvent):
+        self.setFocus()
         if self.character_image and self._is_point_on_character(event.x(), event.y()):
             self.dragging = True
             self.drag_start = (event.x(), event.y())
@@ -310,6 +315,32 @@ class ViewerCanvas(QLabel):
         self.dragging = False
         self.drag_start = None
         super().mouseReleaseEvent(event)
+
+    def wheelEvent(self, event):
+        if not self.character_image:
+            super().wheelEvent(event)
+            return
+
+        delta_y = event.angleDelta().y()
+        if delta_y == 0:
+            super().wheelEvent(event)
+            return
+
+        self.scale_wheel_requested.emit(delta_y)
+        event.accept()
+
+    def keyPressEvent(self, event):
+        if self.character_image:
+            if event.key() == Qt.Key_Right:
+                self.scale_key_requested.emit(1)
+                event.accept()
+                return
+            if event.key() == Qt.Key_Left:
+                self.scale_key_requested.emit(-1)
+                event.accept()
+                return
+
+        super().keyPressEvent(event)
 
 
 class ViewerWindow(QWidget):

@@ -53,6 +53,12 @@ class CustomPortraitApp:
         self.viewer_window.canvas.character_position_changed.connect(
             self.on_viewer_character_position_changed
         )
+        self.viewer_window.canvas.scale_wheel_requested.connect(
+            self.on_viewer_scale_wheel_requested
+        )
+        self.viewer_window.canvas.scale_key_requested.connect(
+            self.on_viewer_scale_key_requested
+        )
         self.editor_window.image_updated.connect(self.on_editor_image_updated)
         self.editor_window.image_cleared.connect(self.on_editor_image_cleared)
         self.editor_window.recent_image_requested.connect(self.on_recent_image_requested)
@@ -223,6 +229,12 @@ class CustomPortraitApp:
 
     def on_viewer_character_position_changed(self, x: int, y: int):
         self.save_current_state(position=(x, y))
+
+    def on_viewer_scale_wheel_requested(self, delta_y: int):
+        self.editor_window.on_scale_wheel_requested(delta_y)
+
+    def on_viewer_scale_key_requested(self, step: int):
+        self.editor_window.on_scale_key_requested(step)
 
     def on_recent_image_requested(self, recent_item):
         image_path = recent_item.get("image_path", "")
